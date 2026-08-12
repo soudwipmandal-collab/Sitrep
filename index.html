@@ -879,8 +879,8 @@ const SECTIONS = [
   },
   {
     key: "crime",
-    label: "Crime Table",
-    caption: "10. Crime Table",
+    label: "13. Crime Table",
+    caption: "13. Crime Table",
     cols: [
       {key:"total", label:"Total", bold:true, pad:true},
       {key:"murder", label:"Murder"},
@@ -902,8 +902,8 @@ const SECTIONS = [
   },
   {
     key: "lims",
-    label: "LIMS Report",
-    caption: "11. LIMS Report",
+    label: "14. LIMS Report",
+    caption: "14. LIMS Report",
     cols: [
       {key:"limsUploaded", label:"Number uploaded in LIMS"}
     ],
@@ -3420,11 +3420,14 @@ function renderSections(){
   appendMetaBlock(sectionsEl, ["armsSeizure", "othersSeizure"]);
 
   appendReviewSubhead(sectionsEl, "9–12 · Remaining serial items");
-  appendMetaBlock(sectionsEl, ["firGist", "idLiquor", "chitFund", "otherIncident", "_footerRollup"]);
+  appendMetaBlock(sectionsEl, ["firGist", "idLiquor", "chitFund", "otherIncident"]);
 
-  appendReviewSubhead(sectionsEl, "Reference tables");
+  appendReviewSubhead(sectionsEl, "13–14 · Reference tables");
   appendSectionBlock(sectionsEl, "crime");
   appendSectionBlock(sectionsEl, "lims");
+
+  appendReviewSubhead(sectionsEl, "Footer roll up");
+  appendMetaBlock(sectionsEl, ["_footerRollup"]);
 }
 
 function buildSectionTable(sec){
@@ -4134,13 +4137,7 @@ function buildFilledDocumentHtml(){
     mso-page-orientation: portrait;
     margin: 1.6cm 1.5cm 1.6cm 1.5cm;
   }
-  @page Section2 {
-    size: 29.7cm 21cm;
-    mso-page-orientation: landscape;
-    margin: 1.3cm 1cm 1.3cm 1cm;
-  }
   div.Section1 { page: Section1; }
-  div.Section2 { page: Section2; }
   body{font-family:'Times New Roman',serif;font-size:11pt;color:#000;}
   table{border-collapse:collapse;width:100%;table-layout:fixed;mso-table-layout-alt:fixed;}
   td,th{border:1px solid #333;padding:3px 5px;font-size:10pt;vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;}
@@ -4250,25 +4247,17 @@ function buildFilledDocumentHtml(){
     <p><b>12. Any other important incident likely to receive public attention:</b></p>
     ${otherIncidentHtml}
 
-    <p><b>13. </b>Ref: Org. No.3312/SB CR/ BKP/18 Dated: 04.07.2018 &amp; Org No. 1062/CR Dt. 03.07.2018 of Police, West Bengal, Org No. 1057/CR Dt. 30.06.2018 of Police, West Bengal &amp; Org. No.3239/SB CR/ BKP/18 Dated: 01.07.2018 of D.C.P, S.B., Barrackpore Police Commissionerate.</p>
+    <p><b>Ref:</b> Org. No.3312/SB CR/ BKP/18 Dated: 04.07.2018 &amp; Org No. 1062/CR Dt. 03.07.2018 of Police, West Bengal, Org No. 1057/CR Dt. 30.06.2018 of Police, West Bengal &amp; Org. No.3239/SB CR/ BKP/18 Dated: 01.07.2018 of D.C.P, S.B., Barrackpore Police Commissionerate.</p>
 
-    
-</div>
-<div class="Section2">
-
-    <p><b>Crime table</b></p>
+    <p><b>13. Crime table</b></p>
     <table class="crime-table">
       <tbody><tr><th>Sl No.</th><th>PS</th>${crimeCols.map(c => `<th${c.isExtra ? ' style="color:#9c2b2b;"' : ""}>${escapeHtml(c.reportLabel || c.label)}</th>`).join("")}</tr>
       ${psRowsHtml("crime", crimeCols, {numbered:true})}
       ${totalRowHtml("crime", crimeCols, {numbered:true})}
     </tbody></table>
-    
-</div>
-<div class="Section1">
 
-
-    <p><b>14. </b>Org. No. : 2052/DCP, South Zone/25 Date: 26.12.2025 (.)</p>
-    <p><b>LIMS Report of ${escapeHtml(coveredDate)}</b></p>
+    <p><b>Org. No. :</b> 2052/DCP, South Zone/25 Date: 26.12.2025 (.)</p>
+    <p><b>14. LIMS Report of ${escapeHtml(coveredDate)}</b></p>
     <table>
       <tbody><tr><th>Sl No.</th><th>Name of PS</th><th>Number uploaded in "LIMS"</th></tr>
       ${psRowsHtml("lims", limsCols, {numbered:true})}
@@ -4298,13 +4287,9 @@ document.getElementById("btnWord").addEventListener("click", async () => {
     // Microsoft Word actually expands on open). That real content is what
     // lets tools that read document.xml directly work correctly: the ACP
     // Zone Sitrep Splitter (mammoth.js), LibreOffice, Google Docs, etc.
-    // Trade-off: this converter builds structure straight from the HTML
-    // tags, not the mixed portrait/landscape @page CSS trick that only
-    // Word's own HTML importer understands — so the Crime Table would come
-    // out in the same orientation as the rest of the document. The
-    // fixDocxCrimeTableLandscape() post-fix below patches in a real OOXML
-    // section break so the Crime table page is landscape here too, matching
-    // "Download Sitrep (.doc)".
+    // The exported DOCX intentionally follows the same single-section flow
+    // as the review UI, so reference tables 13 and 14 remain directly after
+    // item 12 instead of being forced onto a separate page.
     const result = await HTMLToDOCX(inlineCriticalStyles(html), null, {
       title: `DCP South Zone Sitrep ${meta.reportDate || todayDDMMYYYY()}`,
       font: "Times New Roman",
@@ -4332,12 +4317,6 @@ document.getElementById("btnWord").addEventListener("click", async () => {
     // column widths back into the generated OOXML before download.
     // pageSize.width (11906) minus left+right margins (850 each) = 10206.
     blob = await fixDocxColumnWidths(blob, html, 11906 - 850 - 850);
-    // Give the Crime table its own landscape page — see comment above.
-    blob = await fixDocxCrimeTableLandscape(
-      blob, html,
-      {width: 11906, height: 16834},
-      {top: 907, right: 850, bottom: 907, left: 850}
-    );
     downloadBlob(blob, `DCP SOUTH ZONE SITREP ${meta.reportDate || todayDDMMYYYY()}.docx`);
   } catch (err) {
     console.error(err);
