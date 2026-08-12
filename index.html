@@ -474,6 +474,16 @@
   .actionspanel .actions{
     justify-content:center;
   }
+  .review-subhead{
+    font-family: Arial, sans-serif;
+    font-size:13px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--navy);
+    margin:20px 0 10px;
+    padding-top:14px;
+    border-top:1px dashed var(--paper-line);
+  }
   .sectionblock{display:none;}
   .sectionblock.active{display:block;animation:fadeUp .6s ease-out both;}
   .actions{
@@ -724,21 +734,20 @@
     <div class="warnbox" id="globalwarn"></div>
   </section>
 
-  <section class="panel resultspanel" id="resultspanel" style="display:none;">
-    <h2>2 · Review extracted fields</h2>
-    <p class="hint">Review every field against the source before submitting — parsing is heuristic and PS reports vary in header wording. Click any cell to edit.</p>
+  <section class="panel reviewpanel" id="reviewpanel" style="display:none;">
+    <h2>2 · Review serial items 1–12</h2>
+    <p class="hint">Review the sitrep in serial-number order in this single panel: items 1–7 first, item 8 table sub-items next, then the remaining item 8 narrative/seizure entries and items 9–12. Defaults match a routine "Nil" day; edit anything that applies, or use "Fill from PS files" to refresh auto-extracted entries.</p>
+    <div id="metafields"></div>
+    <h3 class="review-subhead">Item 8 tables</h3>
+    <p class="hint">Parsing is heuristic and PS reports vary in header wording; click any cell to edit.</p>
     <div class="section-tabs" id="tabs"></div>
     <div id="sections"></div>
-  </section>
-
-  <section class="panel metapanel" id="metapanel" style="display:none;">
-    <h2>3 · Report details &amp; narrative</h2>
-    <p class="hint">Most of these items aren't in any PS table, so they're not auto-extracted — fill them in here. Defaults match a routine "Nil" day; edit anything that applies. Six exceptions are auto-extracted from each PS report, in PS sequence, one entry per PS that has something to report (routine "Nil" reports are left out, except Gist of FIR which has no "Nil" case): "9. Gist of FIR", "8.v) Gambling and PC Act Arrested", "8.vii) Seizure of illegal Fire Crackers", "10. Report regarding I.D. liquor/Country Spirit,etc:", "11. Report regarding Chit Fund", and "12. Any other important incident likely to receive public attention". Use "Fill from PS files" to refresh any of these, or edit them directly. All items are included when you generate the Word sitrep below.</p>
-    <div id="metafields"></div>
+    <h3 class="review-subhead">Remaining items 8–12</h3>
+    <div id="metafieldsAfter"></div>
   </section>
 
   <section class="panel actionspanel" id="actionspanel" style="display:none;">
-    <h2 style="justify-content:center;">Export</h2>
+    <h2 style="justify-content:center;">3 · Export</h2>
     <div class="actions">
       <button id="btnPrintDoc" class="blue">Download Sitrep (.doc)</button>
       <button id="btnWord" class="blue-light" style="display:none;">Download Sitrep (.docx)</button>
@@ -820,7 +829,7 @@ const TG_UNITS = [
 const SECTIONS = [
   {
     key: "arrests",
-    label: "Arrests",
+    label: "8(i–ii) Arrests",
     caption: "8. Arrests (zone totals derived from PS figures)",
     cols: [
       {key:"totalArrests", label:"Total Arrests"},
@@ -830,13 +839,13 @@ const SECTIONS = [
   },
   {
     key: "specificArrest",
-    label: "Specific-Case Arrestees",
+    label: "8(ii) Specific-Case Arrestees",
     caption: "8(ii) Arrest in Specific Case — list (Name & Address, Date of Arrest, Name of PS, Case Reference, Officer, CCS Portal Uploaded)",
     special: "arresteeList"
   },
   {
     key: "preventive",
-    label: "Preventive Arrests",
+    label: "8(iii) Preventive Arrests",
     caption: "8(iii) Arrest in Preventive Cases",
     cols: [
       {key:"policeAct34", label:"34 Police Act"},
@@ -852,7 +861,7 @@ const SECTIONS = [
   },
   {
     key: "warrant",
-    label: "Warrant Disposal",
+    label: "8(vi) Warrant Disposal",
     caption: "8(vi) Warrantees Arrested / Disposed",
     cols: [
       {key:"nonBailable", label:"Non-Bailable"},
@@ -865,7 +874,7 @@ const SECTIONS = [
   },
   {
     key: "compound",
-    label: "Compound Slip & Fine",
+    label: "8(viii) Compound Slip & Fine",
     caption: "8(viii) Compound Slip and Fine",
     cols: [
       {key:"compoundSlip", label:"Compound Slip"},
@@ -981,9 +990,8 @@ const dropzone = document.getElementById("dropzone");
 const fileInput = document.getElementById("fileinput");
 const fileListEl = document.getElementById("filelist");
 const globalWarn = document.getElementById("globalwarn");
-const resultsPanel = document.getElementById("resultspanel");
+const reviewPanel = document.getElementById("reviewpanel");
 const emptyPanel = document.getElementById("emptypanel");
-const metaPanel = document.getElementById("metapanel");
 const actionsPanel = document.getElementById("actionspanel");
 const splitZonalPanel = document.getElementById("splitzonalpanel");
 const zonePanel = document.getElementById("zonepanel");
@@ -994,6 +1002,7 @@ const zonePanel = document.getElementById("zonepanel");
 // resets closed for the next batch.
 let zonalReportOpen = false;
 const metaFieldsEl = document.getElementById("metafields");
+const metaFieldsAfterEl = document.getElementById("metafieldsAfter");
 const tabsEl = document.getElementById("tabs");
 const sectionsEl = document.getElementById("sections");
 
@@ -1436,11 +1445,9 @@ function renderTgGroup(container, groupLabel){
   });
 }
 
-function renderMetaPanel(){
-  metaFieldsEl.innerHTML = "";
-  const grid = document.createElement("div");
-  grid.className = "metagrid";
-  META_FIELDS.forEach(f => {
+const FIRST_SERIAL_META_KEYS = new Set(["_headerRollup", "item1", "item2", "item3", "item4", "item5", "item6", "item7"]);
+
+function appendMetaField(grid, f){
     if (f.special === "tgGroup"){
       renderTgGroup(grid, f.label);
       return;
@@ -1480,8 +1487,23 @@ function renderMetaPanel(){
     if (f.type === "textarea") requestAnimationFrame(() => autoResizeTextarea(input));
     wrap.appendChild(input);
     grid.appendChild(wrap);
+}
+
+function renderMetaPanel(){
+  metaFieldsEl.innerHTML = "";
+  metaFieldsAfterEl.innerHTML = "";
+
+  const firstGrid = document.createElement("div");
+  firstGrid.className = "metagrid";
+  const afterGrid = document.createElement("div");
+  afterGrid.className = "metagrid";
+
+  META_FIELDS.forEach(f => {
+    appendMetaField(FIRST_SERIAL_META_KEYS.has(f.key) ? firstGrid : afterGrid, f);
   });
-  metaFieldsEl.appendChild(grid);
+
+  metaFieldsEl.appendChild(firstGrid);
+  metaFieldsAfterEl.appendChild(afterGrid);
 }
 
 // Grows a textarea to fit its current content (up to the CSS max-height
@@ -3323,8 +3345,7 @@ function buildArresteeRowsFromRecords(){
 
 function renderResults(){
   if (records.length === 0){
-    resultsPanel.style.display = "none";
-    metaPanel.style.display = "none";
+    reviewPanel.style.display = "none";
     actionsPanel.style.display = "none";
     splitZonalPanel.style.display = "none";
     zonePanel.style.display = "none";
@@ -3333,8 +3354,7 @@ function renderResults(){
     emptyPanel.style.display = "block";
     return;
   }
-  resultsPanel.style.display = "block";
-  metaPanel.style.display = "block";
+  reviewPanel.style.display = "block";
   actionsPanel.style.display = "block";
   splitZonalPanel.style.display = "block";
   zonePanel.style.display = zonalReportOpen ? "block" : "none";
@@ -3345,7 +3365,7 @@ function renderResults(){
   }
   renderTabs();
   renderSections();
-  if (!metaFieldsEl.childElementCount){
+  if (!metaFieldsEl.childElementCount && !metaFieldsAfterEl.childElementCount){
     Object.keys(AUTO_FILL_FIELDS).forEach(key => {
       if (!meta[`_${key}Touched`]) meta[key] = AUTO_FILL_FIELDS[key].build() || AUTO_FILL_FIELDS[key].emptyFallback;
     });
@@ -3356,7 +3376,7 @@ function renderResults(){
     Object.keys(AUTO_FILL_FIELDS).forEach(key => {
       if (meta[`_${key}Touched`]) return;
       meta[key] = AUTO_FILL_FIELDS[key].build() || AUTO_FILL_FIELDS[key].emptyFallback;
-      const el = metaFieldsEl.querySelector(`[data-key="${key}"]`);
+      const el = document.querySelector(`[data-key="${key}"]`);
       if (el){
         el.value = meta[key];
         if (el.tagName === "TEXTAREA") autoResizeTextarea(el);
