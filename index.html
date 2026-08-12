@@ -474,6 +474,16 @@
   .actionspanel .actions{
     justify-content:center;
   }
+  .review-subhead{
+    font-family: Arial, sans-serif;
+    font-size:13px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--navy);
+    margin:20px 0 10px;
+    padding-top:14px;
+    border-top:1px dashed var(--paper-line);
+  }
   .sectionblock{display:none;}
   .sectionblock.active{display:block;animation:fadeUp .6s ease-out both;}
   .actions{
@@ -724,27 +734,15 @@
     <div class="warnbox" id="globalwarn"></div>
   </section>
 
-  <section class="panel metapanel" id="metapanel" style="display:none;">
-    <h2>2 · Review serial items 1–7</h2>
-    <p class="hint">Start with the opening narrative items in sitrep serial-number order. Defaults match a routine "Nil" day; edit anything that applies. Auto-extracted fields are filled from each PS report in PS sequence.</p>
+  <section class="panel reviewpanel" id="reviewpanel" style="display:none;">
+    <h2>2 · Review serial items 1–12</h2>
+    <p class="hint">Review and edit the sitrep in serial-number order in this single panel. Item 8 text fields and tables are interleaved exactly where their sub-points belong, so continue straight down the page from item 1 through item 12.</p>
     <div id="metafields"></div>
-  </section>
-
-  <section class="panel resultspanel" id="resultspanel" style="display:none;">
-    <h2>3 · Review serial item 8 tables</h2>
-    <p class="hint">Continue through item 8 table sub-items in serial-number order. Parsing is heuristic and PS reports vary in header wording; click any cell to edit.</p>
-    <div class="section-tabs" id="tabs"></div>
     <div id="sections"></div>
   </section>
 
-  <section class="panel metacontpanel" id="metacontpanel" style="display:none;">
-    <h2>4 · Review remaining serial items 8–12</h2>
-    <p class="hint">Finish the remaining item 8 narrative/seizure entries, then items 9–12. Use "Fill from PS files" to refresh auto-extracted entries, or edit them directly before export.</p>
-    <div id="metafieldsAfter"></div>
-  </section>
-
   <section class="panel actionspanel" id="actionspanel" style="display:none;">
-    <h2 style="justify-content:center;">5 · Export</h2>
+    <h2 style="justify-content:center;">3 · Export</h2>
     <div class="actions">
       <button id="btnPrintDoc" class="blue">Download Sitrep (.doc)</button>
       <button id="btnWord" class="blue-light" style="display:none;">Download Sitrep (.docx)</button>
@@ -915,8 +913,6 @@ const SECTIONS = [
 
 // state: array of { fileName, psName, raw:{...extracted}, warnings:[] }
 let records = [];
-let activeTab = SECTIONS[0].key;
-
 // Crime-table columns discovered in a PS's docx that aren't part of the
 // standard template (see crimeCategories inside extractFields) — some PSs
 // add a column for a locally-tracked offence category the template has no
@@ -987,9 +983,8 @@ const dropzone = document.getElementById("dropzone");
 const fileInput = document.getElementById("fileinput");
 const fileListEl = document.getElementById("filelist");
 const globalWarn = document.getElementById("globalwarn");
-const resultsPanel = document.getElementById("resultspanel");
+const reviewPanel = document.getElementById("reviewpanel");
 const emptyPanel = document.getElementById("emptypanel");
-const metaPanel = document.getElementById("metapanel");
 const actionsPanel = document.getElementById("actionspanel");
 const metaContinuePanel = document.getElementById("metacontpanel");
 const splitZonalPanel = document.getElementById("splitzonalpanel");
@@ -1001,8 +996,6 @@ const zonePanel = document.getElementById("zonepanel");
 // resets closed for the next batch.
 let zonalReportOpen = false;
 const metaFieldsEl = document.getElementById("metafields");
-const metaFieldsAfterEl = document.getElementById("metafieldsAfter");
-const tabsEl = document.getElementById("tabs");
 const sectionsEl = document.getElementById("sections");
 
 /* ===================================================================
@@ -1444,8 +1437,6 @@ function renderTgGroup(container, groupLabel){
   });
 }
 
-const FIRST_SERIAL_META_KEYS = new Set(["_headerRollup", "item1", "item2", "item3", "item4", "item5", "item6", "item7"]);
-
 function appendMetaField(grid, f){
     if (f.special === "tgGroup"){
       renderTgGroup(grid, f.label);
@@ -1471,6 +1462,7 @@ function appendMetaField(grid, f){
         meta[f.key] = autoField.build() || autoField.emptyFallback;
         meta[`_${f.key}Touched`] = true;
         renderMetaPanel();
+        renderSections();
       });
       wrap.appendChild(fillBtn);
     }
@@ -1488,21 +1480,23 @@ function appendMetaField(grid, f){
     grid.appendChild(wrap);
 }
 
+function metaFieldByKey(key){
+  return META_FIELDS.find(f => f.key === key);
+}
+
+function buildMetaFieldsBlock(keys){
+  const grid = document.createElement("div");
+  grid.className = "metagrid";
+  keys.forEach(key => {
+    const field = metaFieldByKey(key);
+    if (field) appendMetaField(grid, field);
+  });
+  return grid;
+}
+
 function renderMetaPanel(){
   metaFieldsEl.innerHTML = "";
-  metaFieldsAfterEl.innerHTML = "";
-
-  const firstGrid = document.createElement("div");
-  firstGrid.className = "metagrid";
-  const afterGrid = document.createElement("div");
-  afterGrid.className = "metagrid";
-
-  META_FIELDS.forEach(f => {
-    appendMetaField(FIRST_SERIAL_META_KEYS.has(f.key) ? firstGrid : afterGrid, f);
-  });
-
-  metaFieldsEl.appendChild(firstGrid);
-  metaFieldsAfterEl.appendChild(afterGrid);
+  metaFieldsEl.appendChild(buildMetaFieldsBlock(["_headerRollup", "item1", "item2", "item3", "item4", "item5", "item6", "item7"]));
 }
 
 // Grows a textarea to fit its current content (up to the CSS max-height
@@ -3344,9 +3338,7 @@ function buildArresteeRowsFromRecords(){
 
 function renderResults(){
   if (records.length === 0){
-    resultsPanel.style.display = "none";
-    metaPanel.style.display = "none";
-    metaContinuePanel.style.display = "none";
+    reviewPanel.style.display = "none";
     actionsPanel.style.display = "none";
     splitZonalPanel.style.display = "none";
     zonePanel.style.display = "none";
@@ -3355,9 +3347,7 @@ function renderResults(){
     emptyPanel.style.display = "block";
     return;
   }
-  resultsPanel.style.display = "block";
-  metaPanel.style.display = "block";
-  metaContinuePanel.style.display = "block";
+  reviewPanel.style.display = "block";
   actionsPanel.style.display = "block";
   splitZonalPanel.style.display = "block";
   zonePanel.style.display = zonalReportOpen ? "block" : "none";
@@ -3366,38 +3356,12 @@ function renderResults(){
   if (!arresteeRowsTouched){
     arresteeRows = buildArresteeRowsFromRecords();
   }
-  renderTabs();
-  renderSections();
-  if (!metaFieldsEl.childElementCount && !metaFieldsAfterEl.childElementCount){
-    Object.keys(AUTO_FILL_FIELDS).forEach(key => {
-      if (!meta[`_${key}Touched`]) meta[key] = AUTO_FILL_FIELDS[key].build() || AUTO_FILL_FIELDS[key].emptyFallback;
-    });
-    renderMetaPanel();
-  } else {
-    // These are the only textarea fields — update them in place so editing
-    // other meta fields elsewhere doesn't lose focus on every file added.
-    Object.keys(AUTO_FILL_FIELDS).forEach(key => {
-      if (meta[`_${key}Touched`]) return;
-      meta[key] = AUTO_FILL_FIELDS[key].build() || AUTO_FILL_FIELDS[key].emptyFallback;
-      const el = document.querySelector(`[data-key="${key}"]`);
-      if (el){
-        el.value = meta[key];
-        if (el.tagName === "TEXTAREA") autoResizeTextarea(el);
-      }
-    });
-  }
-  renderZonePanel();
-}
-
-function renderTabs(){
-  tabsEl.innerHTML = "";
-  SECTIONS.forEach(sec => {
-    const btn = document.createElement("button");
-    btn.textContent = sec.label;
-    btn.className = sec.key === activeTab ? "active" : "";
-    btn.addEventListener("click", () => { activeTab = sec.key; renderResults(); });
-    tabsEl.appendChild(btn);
+  Object.keys(AUTO_FILL_FIELDS).forEach(key => {
+    if (!meta[`_${key}Touched`]) meta[key] = AUTO_FILL_FIELDS[key].build() || AUTO_FILL_FIELDS[key].emptyFallback;
   });
+  renderMetaPanel();
+  renderSections();
+  renderZonePanel();
 }
 
 function orderedRecords(){
@@ -3408,15 +3372,59 @@ function orderedRecords(){
   });
 }
 
+function sectionByKey(key){
+  return SECTIONS.find(sec => sec.key === key);
+}
+
+function appendReviewSubhead(container, text, hint){
+  const heading = document.createElement("h3");
+  heading.className = "review-subhead";
+  heading.textContent = text;
+  container.appendChild(heading);
+  if (hint){
+    const p = document.createElement("p");
+    p.className = "hint";
+    p.textContent = hint;
+    container.appendChild(p);
+  }
+}
+
+function appendSectionBlock(container, secKey){
+  const sec = sectionByKey(secKey);
+  if (!sec) return;
+  const block = document.createElement("div");
+  block.className = "sectionblock active";
+  block.id = "block_" + sec.key;
+  block.appendChild(sec.special === "arresteeList" ? buildArresteeTable() : buildSectionTable(sec));
+  container.appendChild(block);
+}
+
+function appendMetaBlock(container, keys){
+  const block = document.createElement("div");
+  block.className = "sectionblock active";
+  block.appendChild(buildMetaFieldsBlock(keys));
+  container.appendChild(block);
+}
+
 function renderSections(){
   sectionsEl.innerHTML = "";
-  SECTIONS.forEach(sec => {
-    const block = document.createElement("div");
-    block.className = "sectionblock" + (sec.key === activeTab ? " active" : "");
-    block.id = "block_" + sec.key;
-    block.appendChild(sec.special === "arresteeList" ? buildArresteeTable() : buildSectionTable(sec));
-    sectionsEl.appendChild(block);
-  });
+  appendReviewSubhead(sectionsEl, "8 · Arrests", "Parsing is heuristic and PS reports vary in header wording; click any table cell or text field to edit.");
+  appendSectionBlock(sectionsEl, "arrests");
+  appendSectionBlock(sectionsEl, "specificArrest");
+  appendSectionBlock(sectionsEl, "preventive");
+  appendMetaBlock(sectionsEl, ["bnss126", "gambling", "wbgAct"]);
+  appendSectionBlock(sectionsEl, "warrant");
+  appendMetaBlock(sectionsEl, ["fireCrackers"]);
+  appendMetaBlock(sectionsEl, ["_tgGroup"]);
+  appendSectionBlock(sectionsEl, "compound");
+  appendMetaBlock(sectionsEl, ["armsSeizure", "othersSeizure"]);
+
+  appendReviewSubhead(sectionsEl, "9–12 · Remaining serial items");
+  appendMetaBlock(sectionsEl, ["firGist", "idLiquor", "chitFund", "otherIncident", "_footerRollup"]);
+
+  appendReviewSubhead(sectionsEl, "Reference tables");
+  appendSectionBlock(sectionsEl, "crime");
+  appendSectionBlock(sectionsEl, "lims");
 }
 
 function buildSectionTable(sec){
