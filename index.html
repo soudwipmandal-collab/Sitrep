@@ -474,6 +474,16 @@
   .actionspanel .actions{
     justify-content:center;
   }
+  .review-subhead{
+    font-family: Arial, sans-serif;
+    font-size:13px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--navy);
+    margin:20px 0 10px;
+    padding-top:14px;
+    border-top:1px dashed var(--paper-line);
+  }
   .sectionblock{display:none;}
   .sectionblock.active{display:block;animation:fadeUp .6s ease-out both;}
   .actions{
@@ -724,21 +734,15 @@
     <div class="warnbox" id="globalwarn"></div>
   </section>
 
-  <section class="panel resultspanel" id="resultspanel" style="display:none;">
-    <h2>2 · Review extracted fields</h2>
-    <p class="hint">Review every field against the source before submitting — parsing is heuristic and PS reports vary in header wording. Click any cell to edit.</p>
-    <div class="section-tabs" id="tabs"></div>
+  <section class="panel reviewpanel" id="reviewpanel" style="display:none;">
+    <h2>2 · Review serial items 1–12</h2>
+    <p class="hint">Review and edit the sitrep in serial-number order in this single panel. Item 8 text fields and tables are interleaved exactly where their sub-points belong, so continue straight down the page from item 1 through item 12.</p>
+    <div id="metafields"></div>
     <div id="sections"></div>
   </section>
 
-  <section class="panel metapanel" id="metapanel" style="display:none;">
-    <h2>3 · Report details &amp; narrative</h2>
-    <p class="hint">Most of these items aren't in any PS table, so they're not auto-extracted — fill them in here. Defaults match a routine "Nil" day; edit anything that applies. Six exceptions are auto-extracted from each PS report, in PS sequence, one entry per PS that has something to report (routine "Nil" reports are left out, except Gist of FIR which has no "Nil" case): "9. Gist of FIR", "8.v) Gambling and PC Act Arrested", "8.vii) Seizure of illegal Fire Crackers", "10. Report regarding I.D. liquor/Country Spirit,etc:", "11. Report regarding Chit Fund", and "12. Any other important incident likely to receive public attention". Use "Fill from PS files" to refresh any of these, or edit them directly. All items are included when you generate the Word sitrep below.</p>
-    <div id="metafields"></div>
-  </section>
-
   <section class="panel actionspanel" id="actionspanel" style="display:none;">
-    <h2 style="justify-content:center;">Export</h2>
+    <h2 style="justify-content:center;">3 · Export</h2>
     <div class="actions">
       <button id="btnPrintDoc" class="blue">Download Sitrep (.doc)</button>
       <button id="btnWord" class="blue-light" style="display:none;">Download Sitrep (.docx)</button>
@@ -820,8 +824,8 @@ const TG_UNITS = [
 const SECTIONS = [
   {
     key: "arrests",
-    label: "Arrests",
-    caption: "8. Arrests (zone totals derived from PS figures)",
+    label: "8.i) Arrests",
+    caption: "8.i) Arrests (zone totals derived from PS figures)",
     cols: [
       {key:"totalArrests", label:"Total Arrests"},
       {key:"specificArrests", label:"Arrest in Specific Case"}
@@ -830,13 +834,13 @@ const SECTIONS = [
   },
   {
     key: "specificArrest",
-    label: "Specific-Case Arrestees",
+    label: "8(ii) Specific-Case Arrestees",
     caption: "8(ii) Arrest in Specific Case — list (Name & Address, Date of Arrest, Name of PS, Case Reference, Officer, CCS Portal Uploaded)",
     special: "arresteeList"
   },
   {
     key: "preventive",
-    label: "Preventive Arrests",
+    label: "8(iii) Preventive Arrests",
     caption: "8(iii) Arrest in Preventive Cases",
     cols: [
       {key:"policeAct34", label:"34 Police Act"},
@@ -852,7 +856,7 @@ const SECTIONS = [
   },
   {
     key: "warrant",
-    label: "Warrant Disposal",
+    label: "8(vi) Warrant Disposal",
     caption: "8(vi) Warrantees Arrested / Disposed",
     cols: [
       {key:"nonBailable", label:"Non-Bailable"},
@@ -865,7 +869,7 @@ const SECTIONS = [
   },
   {
     key: "compound",
-    label: "Compound Slip & Fine",
+    label: "8(viii) Compound Slip & Fine",
     caption: "8(viii) Compound Slip and Fine",
     cols: [
       {key:"compoundSlip", label:"Compound Slip"},
@@ -875,8 +879,8 @@ const SECTIONS = [
   },
   {
     key: "crime",
-    label: "Crime Table",
-    caption: "10. Crime Table",
+    label: "13. Crime Table",
+    caption: "13. Crime Table — Ref: Org. No.3312/SB CR/ BKP/18 Dated: 04.07.2018; Org No. 1062/CR Dt. 03.07.2018 of Police, West Bengal; Org No. 1057/CR Dt. 30.06.2018 of Police, West Bengal; Org. No.3239/SB CR/ BKP/18 Dated: 01.07.2018 of D.C.P, S.B., Barrackpore Police Commissionerate",
     cols: [
       {key:"total", label:"Total", bold:true, pad:true},
       {key:"murder", label:"Murder"},
@@ -898,8 +902,8 @@ const SECTIONS = [
   },
   {
     key: "lims",
-    label: "LIMS Report",
-    caption: "11. LIMS Report",
+    label: "14. LIMS Report",
+    caption: "14. LIMS Report — Org. No. : 2052/DCP, South Zone/25 Date: 26.12.2025 (.)",
     cols: [
       {key:"limsUploaded", label:"Number uploaded in LIMS"}
     ],
@@ -909,8 +913,6 @@ const SECTIONS = [
 
 // state: array of { fileName, psName, raw:{...extracted}, warnings:[] }
 let records = [];
-let activeTab = SECTIONS[0].key;
-
 // Crime-table columns discovered in a PS's docx that aren't part of the
 // standard template (see crimeCategories inside extractFields) — some PSs
 // add a column for a locally-tracked offence category the template has no
@@ -981,9 +983,8 @@ const dropzone = document.getElementById("dropzone");
 const fileInput = document.getElementById("fileinput");
 const fileListEl = document.getElementById("filelist");
 const globalWarn = document.getElementById("globalwarn");
-const resultsPanel = document.getElementById("resultspanel");
+const reviewPanel = document.getElementById("reviewpanel");
 const emptyPanel = document.getElementById("emptypanel");
-const metaPanel = document.getElementById("metapanel");
 const actionsPanel = document.getElementById("actionspanel");
 const splitZonalPanel = document.getElementById("splitzonalpanel");
 const zonePanel = document.getElementById("zonepanel");
@@ -994,7 +995,6 @@ const zonePanel = document.getElementById("zonepanel");
 // resets closed for the next batch.
 let zonalReportOpen = false;
 const metaFieldsEl = document.getElementById("metafields");
-const tabsEl = document.getElementById("tabs");
 const sectionsEl = document.getElementById("sections");
 
 /* ===================================================================
@@ -1427,7 +1427,10 @@ function renderTgGroup(container, groupLabel){
       input.type = "text";
       input.dataset.key = f.key;
       input.value = meta[f.key];
-      input.addEventListener("input", e => { meta[f.key] = e.target.value; });
+      input.addEventListener("input", e => {
+        meta[f.key] = e.target.value;
+        syncCompoundTableFromTgRollup();
+      });
       wrap.appendChild(input);
       row.appendChild(wrap);
     });
@@ -1436,11 +1439,7 @@ function renderTgGroup(container, groupLabel){
   });
 }
 
-function renderMetaPanel(){
-  metaFieldsEl.innerHTML = "";
-  const grid = document.createElement("div");
-  grid.className = "metagrid";
-  META_FIELDS.forEach(f => {
+function appendMetaField(grid, f){
     if (f.special === "tgGroup"){
       renderTgGroup(grid, f.label);
       return;
@@ -1465,6 +1464,7 @@ function renderMetaPanel(){
         meta[f.key] = autoField.build() || autoField.emptyFallback;
         meta[`_${f.key}Touched`] = true;
         renderMetaPanel();
+        renderSections();
       });
       wrap.appendChild(fillBtn);
     }
@@ -1480,8 +1480,25 @@ function renderMetaPanel(){
     if (f.type === "textarea") requestAnimationFrame(() => autoResizeTextarea(input));
     wrap.appendChild(input);
     grid.appendChild(wrap);
+}
+
+function metaFieldByKey(key){
+  return META_FIELDS.find(f => f.key === key);
+}
+
+function buildMetaFieldsBlock(keys){
+  const grid = document.createElement("div");
+  grid.className = "metagrid";
+  keys.forEach(key => {
+    const field = metaFieldByKey(key);
+    if (field) appendMetaField(grid, field);
   });
-  metaFieldsEl.appendChild(grid);
+  return grid;
+}
+
+function renderMetaPanel(){
+  metaFieldsEl.innerHTML = "";
+  metaFieldsEl.appendChild(buildMetaFieldsBlock(["_headerRollup", "item1", "item2", "item3", "item4", "item5", "item6", "item7"]));
 }
 
 // Grows a textarea to fit its current content (up to the CSS max-height
@@ -3323,8 +3340,7 @@ function buildArresteeRowsFromRecords(){
 
 function renderResults(){
   if (records.length === 0){
-    resultsPanel.style.display = "none";
-    metaPanel.style.display = "none";
+    reviewPanel.style.display = "none";
     actionsPanel.style.display = "none";
     splitZonalPanel.style.display = "none";
     zonePanel.style.display = "none";
@@ -3333,8 +3349,7 @@ function renderResults(){
     emptyPanel.style.display = "block";
     return;
   }
-  resultsPanel.style.display = "block";
-  metaPanel.style.display = "block";
+  reviewPanel.style.display = "block";
   actionsPanel.style.display = "block";
   splitZonalPanel.style.display = "block";
   zonePanel.style.display = zonalReportOpen ? "block" : "none";
@@ -3343,38 +3358,12 @@ function renderResults(){
   if (!arresteeRowsTouched){
     arresteeRows = buildArresteeRowsFromRecords();
   }
-  renderTabs();
-  renderSections();
-  if (!metaFieldsEl.childElementCount){
-    Object.keys(AUTO_FILL_FIELDS).forEach(key => {
-      if (!meta[`_${key}Touched`]) meta[key] = AUTO_FILL_FIELDS[key].build() || AUTO_FILL_FIELDS[key].emptyFallback;
-    });
-    renderMetaPanel();
-  } else {
-    // These are the only textarea fields — update them in place so editing
-    // other meta fields elsewhere doesn't lose focus on every file added.
-    Object.keys(AUTO_FILL_FIELDS).forEach(key => {
-      if (meta[`_${key}Touched`]) return;
-      meta[key] = AUTO_FILL_FIELDS[key].build() || AUTO_FILL_FIELDS[key].emptyFallback;
-      const el = metaFieldsEl.querySelector(`[data-key="${key}"]`);
-      if (el){
-        el.value = meta[key];
-        if (el.tagName === "TEXTAREA") autoResizeTextarea(el);
-      }
-    });
-  }
-  renderZonePanel();
-}
-
-function renderTabs(){
-  tabsEl.innerHTML = "";
-  SECTIONS.forEach(sec => {
-    const btn = document.createElement("button");
-    btn.textContent = sec.label;
-    btn.className = sec.key === activeTab ? "active" : "";
-    btn.addEventListener("click", () => { activeTab = sec.key; renderResults(); });
-    tabsEl.appendChild(btn);
+  Object.keys(AUTO_FILL_FIELDS).forEach(key => {
+    if (!meta[`_${key}Touched`]) meta[key] = AUTO_FILL_FIELDS[key].build() || AUTO_FILL_FIELDS[key].emptyFallback;
   });
+  renderMetaPanel();
+  renderSections();
+  renderZonePanel();
 }
 
 function orderedRecords(){
@@ -3385,14 +3374,99 @@ function orderedRecords(){
   });
 }
 
+function sectionByKey(key){
+  return SECTIONS.find(sec => sec.key === key);
+}
+
+function appendReviewSubhead(container, text, hint){
+  const heading = document.createElement("h3");
+  heading.className = "review-subhead";
+  heading.textContent = text;
+  container.appendChild(heading);
+  if (hint){
+    const p = document.createElement("p");
+    p.className = "hint";
+    p.textContent = hint;
+    container.appendChild(p);
+  }
+}
+
+function appendSectionBlock(container, secKey){
+  const sec = sectionByKey(secKey);
+  if (!sec) return;
+  const block = document.createElement("div");
+  block.className = "sectionblock active";
+  block.id = "block_" + sec.key;
+  block.appendChild(sec.special === "arresteeList" ? buildArresteeTable() : buildSectionTable(sec));
+  container.appendChild(block);
+}
+
+function appendMetaBlock(container, keys){
+  const block = document.createElement("div");
+  block.className = "sectionblock active";
+  block.appendChild(buildMetaFieldsBlock(keys));
+  container.appendChild(block);
+}
+
 function renderSections(){
   sectionsEl.innerHTML = "";
-  SECTIONS.forEach(sec => {
-    const block = document.createElement("div");
-    block.className = "sectionblock" + (sec.key === activeTab ? " active" : "");
-    block.id = "block_" + sec.key;
-    block.appendChild(sec.special === "arresteeList" ? buildArresteeTable() : buildSectionTable(sec));
-    sectionsEl.appendChild(block);
+  appendReviewSubhead(sectionsEl, "8 · Arrests", "Parsing is heuristic and PS reports vary in header wording; click any table cell or text field to edit.");
+  appendSectionBlock(sectionsEl, "arrests");
+  appendSectionBlock(sectionsEl, "specificArrest");
+  appendSectionBlock(sectionsEl, "preventive");
+  appendMetaBlock(sectionsEl, ["bnss126", "gambling", "wbgAct"]);
+  appendSectionBlock(sectionsEl, "warrant");
+  appendMetaBlock(sectionsEl, ["fireCrackers"]);
+  appendMetaBlock(sectionsEl, ["_tgGroup"]);
+  appendSectionBlock(sectionsEl, "compound");
+  appendMetaBlock(sectionsEl, ["armsSeizure", "othersSeizure"]);
+
+  appendReviewSubhead(sectionsEl, "9–12 · Remaining serial items");
+  appendMetaBlock(sectionsEl, ["firGist", "idLiquor", "chitFund", "otherIncident"]);
+
+  appendReviewSubhead(sectionsEl, "13–14 · Reference tables");
+  appendSectionBlock(sectionsEl, "crime");
+  appendSectionBlock(sectionsEl, "lims");
+
+  appendReviewSubhead(sectionsEl, "Footer roll up");
+  appendMetaBlock(sectionsEl, ["_footerRollup"]);
+}
+
+function syncCompoundTableFromTgRollup(){
+  const table = sectionsEl ? sectionsEl.querySelector("#block_compound table.data") : null;
+  if (!table) return;
+  TG_UNITS.forEach(u => {
+    const slipCell = table.querySelector(`[data-tg-key="${u.slipKey}"]`);
+    const fineCell = table.querySelector(`[data-tg-key="${u.fineKey}"]`);
+    const slip = String(meta[u.slipKey] || "NIL").trim() || "NIL";
+    const fine = String(meta[u.fineKey] || "NIL").trim() || "NIL";
+    if (slipCell) slipCell.textContent = dashifyCell(slip);
+    if (fineCell) fineCell.textContent = dashifyCell(fine);
+  });
+  const sec = sectionByKey("compound");
+  if (sec) refreshTotalRow(sec, table);
+}
+
+function appendCompoundTgRows(tbody){
+  TG_UNITS.forEach(u => {
+    const tr = document.createElement("tr");
+    const nameTh = document.createElement("th");
+    nameTh.textContent = u.label;
+    tr.appendChild(nameTh);
+
+    const slipTd = document.createElement("td");
+    slipTd.className = "num";
+    slipTd.dataset.tgKey = u.slipKey;
+    slipTd.textContent = dashifyCell(String(meta[u.slipKey] || "NIL").trim() || "NIL");
+    tr.appendChild(slipTd);
+
+    const fineTd = document.createElement("td");
+    fineTd.className = "num";
+    fineTd.dataset.tgKey = u.fineKey;
+    fineTd.textContent = dashifyCell(String(meta[u.fineKey] || "NIL").trim() || "NIL");
+    tr.appendChild(fineTd);
+
+    tbody.appendChild(tr);
   });
 }
 
@@ -3413,6 +3487,7 @@ function buildSectionTable(sec){
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
+  if (sec.key === "compound") appendCompoundTgRows(tbody);
   const rows = orderedRecords();
   rows.forEach(rec => {
     const tr = document.createElement("tr");
@@ -3465,6 +3540,18 @@ function refreshTotalRow(sec, table){
       return;
     }
     let sum = 0, any = false;
+    if (sec.key === "compound"){
+      const tgKey = col.key === "compoundSlip" ? "slipKey" : col.key === "fine" ? "fineKey" : null;
+      if (tgKey){
+        TG_UNITS.forEach(u => {
+          const v = String(meta[u[tgKey]] || "").trim();
+          if (/^\d+$/.test(v)){
+            sum += parseInt(v, 10);
+            any = true;
+          }
+        });
+      }
+    }
     rows.forEach(rec => {
       const v = rec.data[sec.key] ? rec.data[sec.key][col.key] : null;
       if (v != null && /^\d+$/.test(String(v).trim())){
@@ -4103,13 +4190,7 @@ function buildFilledDocumentHtml(){
     mso-page-orientation: portrait;
     margin: 1.6cm 1.5cm 1.6cm 1.5cm;
   }
-  @page Section2 {
-    size: 29.7cm 21cm;
-    mso-page-orientation: landscape;
-    margin: 1.3cm 1cm 1.3cm 1cm;
-  }
   div.Section1 { page: Section1; }
-  div.Section2 { page: Section2; }
   body{font-family:'Times New Roman',serif;font-size:11pt;color:#000;}
   table{border-collapse:collapse;width:100%;table-layout:fixed;mso-table-layout-alt:fixed;}
   td,th{border:1px solid #333;padding:3px 5px;font-size:10pt;vertical-align:top;word-wrap:break-word;overflow-wrap:break-word;}
@@ -4219,25 +4300,14 @@ function buildFilledDocumentHtml(){
     <p><b>12. Any other important incident likely to receive public attention:</b></p>
     ${otherIncidentHtml}
 
-    <p><b>13. </b>Ref: Org. No.3312/SB CR/ BKP/18 Dated: 04.07.2018 &amp; Org No. 1062/CR Dt. 03.07.2018 of Police, West Bengal, Org No. 1057/CR Dt. 30.06.2018 of Police, West Bengal &amp; Org. No.3239/SB CR/ BKP/18 Dated: 01.07.2018 of D.C.P, S.B., Barrackpore Police Commissionerate.</p>
-
-    
-</div>
-<div class="Section2">
-
-    <p><b>Crime table</b></p>
+    <p><b>13. Crime table — Ref:</b> Org. No.3312/SB CR/ BKP/18 Dated: 04.07.2018; Org No. 1062/CR Dt. 03.07.2018 of Police, West Bengal; Org No. 1057/CR Dt. 30.06.2018 of Police, West Bengal; Org. No.3239/SB CR/ BKP/18 Dated: 01.07.2018 of D.C.P, S.B., Barrackpore Police Commissionerate.</p>
     <table class="crime-table">
       <tbody><tr><th>Sl No.</th><th>PS</th>${crimeCols.map(c => `<th${c.isExtra ? ' style="color:#9c2b2b;"' : ""}>${escapeHtml(c.reportLabel || c.label)}</th>`).join("")}</tr>
       ${psRowsHtml("crime", crimeCols, {numbered:true})}
       ${totalRowHtml("crime", crimeCols, {numbered:true})}
     </tbody></table>
-    
-</div>
-<div class="Section1">
 
-
-    <p><b>14. </b>Org. No. : 2052/DCP, South Zone/25 Date: 26.12.2025 (.)</p>
-    <p><b>LIMS Report of ${escapeHtml(coveredDate)}</b></p>
+    <p><b>14. LIMS Report of ${escapeHtml(coveredDate)} — Org. No. :</b> 2052/DCP, South Zone/25 Date: 26.12.2025 (.)</p>
     <table>
       <tbody><tr><th>Sl No.</th><th>Name of PS</th><th>Number uploaded in "LIMS"</th></tr>
       ${psRowsHtml("lims", limsCols, {numbered:true})}
@@ -4267,13 +4337,9 @@ document.getElementById("btnWord").addEventListener("click", async () => {
     // Microsoft Word actually expands on open). That real content is what
     // lets tools that read document.xml directly work correctly: the ACP
     // Zone Sitrep Splitter (mammoth.js), LibreOffice, Google Docs, etc.
-    // Trade-off: this converter builds structure straight from the HTML
-    // tags, not the mixed portrait/landscape @page CSS trick that only
-    // Word's own HTML importer understands — so the Crime Table would come
-    // out in the same orientation as the rest of the document. The
-    // fixDocxCrimeTableLandscape() post-fix below patches in a real OOXML
-    // section break so the Crime table page is landscape here too, matching
-    // "Download Sitrep (.doc)".
+    // The exported DOCX intentionally follows the same single-section flow
+    // as the review UI, so reference tables 13 and 14 remain directly after
+    // item 12 instead of being forced onto a separate page.
     const result = await HTMLToDOCX(inlineCriticalStyles(html), null, {
       title: `DCP South Zone Sitrep ${meta.reportDate || todayDDMMYYYY()}`,
       font: "Times New Roman",
@@ -4301,12 +4367,6 @@ document.getElementById("btnWord").addEventListener("click", async () => {
     // column widths back into the generated OOXML before download.
     // pageSize.width (11906) minus left+right margins (850 each) = 10206.
     blob = await fixDocxColumnWidths(blob, html, 11906 - 850 - 850);
-    // Give the Crime table its own landscape page — see comment above.
-    blob = await fixDocxCrimeTableLandscape(
-      blob, html,
-      {width: 11906, height: 16834},
-      {top: 907, right: 850, bottom: 907, left: 850}
-    );
     downloadBlob(blob, `DCP SOUTH ZONE SITREP ${meta.reportDate || todayDDMMYYYY()}.docx`);
   } catch (err) {
     console.error(err);
