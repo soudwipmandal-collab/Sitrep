@@ -824,8 +824,8 @@ const TG_UNITS = [
 const SECTIONS = [
   {
     key: "arrests",
-    label: "8(i–ii) Arrests",
-    caption: "8. Arrests (zone totals derived from PS figures)",
+    label: "8.i) Arrests",
+    caption: "8.i) Arrests (zone totals derived from PS figures)",
     cols: [
       {key:"totalArrests", label:"Total Arrests"},
       {key:"specificArrests", label:"Arrest in Specific Case"}
@@ -880,7 +880,7 @@ const SECTIONS = [
   {
     key: "crime",
     label: "13. Crime Table",
-    caption: "13. Crime Table",
+    caption: "13. Crime Table — Ref: Org. No.3312/SB CR/ BKP/18 Dated: 04.07.2018; Org No. 1062/CR Dt. 03.07.2018 of Police, West Bengal; Org No. 1057/CR Dt. 30.06.2018 of Police, West Bengal; Org. No.3239/SB CR/ BKP/18 Dated: 01.07.2018 of D.C.P, S.B., Barrackpore Police Commissionerate",
     cols: [
       {key:"total", label:"Total", bold:true, pad:true},
       {key:"murder", label:"Murder"},
@@ -903,7 +903,7 @@ const SECTIONS = [
   {
     key: "lims",
     label: "14. LIMS Report",
-    caption: "14. LIMS Report",
+    caption: "14. LIMS Report — Org. No. : 2052/DCP, South Zone/25 Date: 26.12.2025 (.)",
     cols: [
       {key:"limsUploaded", label:"Number uploaded in LIMS"}
     ],
@@ -1428,7 +1428,10 @@ function renderTgGroup(container, groupLabel){
       input.type = "text";
       input.dataset.key = f.key;
       input.value = meta[f.key];
-      input.addEventListener("input", e => { meta[f.key] = e.target.value; });
+      input.addEventListener("input", e => {
+        meta[f.key] = e.target.value;
+        syncCompoundTableFromTgRollup();
+      });
       wrap.appendChild(input);
       row.appendChild(wrap);
     });
@@ -3430,6 +3433,44 @@ function renderSections(){
   appendMetaBlock(sectionsEl, ["_footerRollup"]);
 }
 
+function syncCompoundTableFromTgRollup(){
+  const table = sectionsEl ? sectionsEl.querySelector("#block_compound table.data") : null;
+  if (!table) return;
+  TG_UNITS.forEach(u => {
+    const slipCell = table.querySelector(`[data-tg-key="${u.slipKey}"]`);
+    const fineCell = table.querySelector(`[data-tg-key="${u.fineKey}"]`);
+    const slip = String(meta[u.slipKey] || "NIL").trim() || "NIL";
+    const fine = String(meta[u.fineKey] || "NIL").trim() || "NIL";
+    if (slipCell) slipCell.textContent = dashifyCell(slip);
+    if (fineCell) fineCell.textContent = dashifyCell(fine);
+  });
+  const sec = sectionByKey("compound");
+  if (sec) refreshTotalRow(sec, table);
+}
+
+function appendCompoundTgRows(tbody){
+  TG_UNITS.forEach(u => {
+    const tr = document.createElement("tr");
+    const nameTh = document.createElement("th");
+    nameTh.textContent = u.label;
+    tr.appendChild(nameTh);
+
+    const slipTd = document.createElement("td");
+    slipTd.className = "num";
+    slipTd.dataset.tgKey = u.slipKey;
+    slipTd.textContent = dashifyCell(String(meta[u.slipKey] || "NIL").trim() || "NIL");
+    tr.appendChild(slipTd);
+
+    const fineTd = document.createElement("td");
+    fineTd.className = "num";
+    fineTd.dataset.tgKey = u.fineKey;
+    fineTd.textContent = dashifyCell(String(meta[u.fineKey] || "NIL").trim() || "NIL");
+    tr.appendChild(fineTd);
+
+    tbody.appendChild(tr);
+  });
+}
+
 function buildSectionTable(sec){
   const wrap = document.createElement("div");
   wrap.className = "tablewrap";
@@ -3447,6 +3488,7 @@ function buildSectionTable(sec){
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
+  if (sec.key === "compound") appendCompoundTgRows(tbody);
   const rows = orderedRecords();
   rows.forEach(rec => {
     const tr = document.createElement("tr");
@@ -3499,6 +3541,18 @@ function refreshTotalRow(sec, table){
       return;
     }
     let sum = 0, any = false;
+    if (sec.key === "compound"){
+      const tgKey = col.key === "compoundSlip" ? "slipKey" : col.key === "fine" ? "fineKey" : null;
+      if (tgKey){
+        TG_UNITS.forEach(u => {
+          const v = String(meta[u[tgKey]] || "").trim();
+          if (/^\d+$/.test(v)){
+            sum += parseInt(v, 10);
+            any = true;
+          }
+        });
+      }
+    }
     rows.forEach(rec => {
       const v = rec.data[sec.key] ? rec.data[sec.key][col.key] : null;
       if (v != null && /^\d+$/.test(String(v).trim())){
@@ -4247,17 +4301,14 @@ function buildFilledDocumentHtml(){
     <p><b>12. Any other important incident likely to receive public attention:</b></p>
     ${otherIncidentHtml}
 
-    <p><b>Ref:</b> Org. No.3312/SB CR/ BKP/18 Dated: 04.07.2018 &amp; Org No. 1062/CR Dt. 03.07.2018 of Police, West Bengal, Org No. 1057/CR Dt. 30.06.2018 of Police, West Bengal &amp; Org. No.3239/SB CR/ BKP/18 Dated: 01.07.2018 of D.C.P, S.B., Barrackpore Police Commissionerate.</p>
-
-    <p><b>13. Crime table</b></p>
+    <p><b>13. Crime table — Ref:</b> Org. No.3312/SB CR/ BKP/18 Dated: 04.07.2018; Org No. 1062/CR Dt. 03.07.2018 of Police, West Bengal; Org No. 1057/CR Dt. 30.06.2018 of Police, West Bengal; Org. No.3239/SB CR/ BKP/18 Dated: 01.07.2018 of D.C.P, S.B., Barrackpore Police Commissionerate.</p>
     <table class="crime-table">
       <tbody><tr><th>Sl No.</th><th>PS</th>${crimeCols.map(c => `<th${c.isExtra ? ' style="color:#9c2b2b;"' : ""}>${escapeHtml(c.reportLabel || c.label)}</th>`).join("")}</tr>
       ${psRowsHtml("crime", crimeCols, {numbered:true})}
       ${totalRowHtml("crime", crimeCols, {numbered:true})}
     </tbody></table>
 
-    <p><b>Org. No. :</b> 2052/DCP, South Zone/25 Date: 26.12.2025 (.)</p>
-    <p><b>14. LIMS Report of ${escapeHtml(coveredDate)}</b></p>
+    <p><b>14. LIMS Report of ${escapeHtml(coveredDate)} — Org. No. :</b> 2052/DCP, South Zone/25 Date: 26.12.2025 (.)</p>
     <table>
       <tbody><tr><th>Sl No.</th><th>Name of PS</th><th>Number uploaded in "LIMS"</th></tr>
       ${psRowsHtml("lims", limsCols, {numbered:true})}
